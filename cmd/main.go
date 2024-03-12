@@ -3,11 +3,11 @@ package main
 import (
 	"image/color"
 	"log"
-	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
-	vec "github.com/hhubert6/Raycaster/internal"
+	ray "github.com/hhubert6/Raycaster/internal/raycaster"
+	vec "github.com/hhubert6/Raycaster/internal/vector"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 var COLOR_GREY = color.RGBA{200, 200, 200, 255}
 
 type Game struct {
-	gridMap   [MAP_HEIGHT][MAP_WIDTH]int
+	gridMap   [][]int
 	playerPos vec.Vec2
 }
 
@@ -61,60 +61,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	playerDisplayX, playerDisplayY := getDisplayPos(g.playerPos)
 	vector.StrokeLine(screen, playerDisplayX, playerDisplayY, float32(mouseX), float32(mouseY), 1, color.White, true)
 
-	// raycasting
-	rayStart := g.playerPos.Copy()
-	rayDir := vec.Vec2{float64(mouseX) / TILE_SIZE, float64(mouseY) / TILE_SIZE}
-	rayDir.Sub(g.playerPos)
-	rayDir.Normalize()
-	vRayUnitStepSize := vec.Vec2{math.Hypot(1, rayDir[1]/rayDir[0]), math.Hypot(1, rayDir[0]/rayDir[1])}
-
-	vMapCheck := vec.Vec2{math.Floor(rayStart[0]), math.Floor(rayStart[1])}
-	vRayLength1D := vec.Vec2{}
-
-	vStep := vec.Vec2{}
-
-	if rayDir[0] < 0 {
-		vStep[0] = -1
-		vRayLength1D[0] = (g.playerPos[0] - vMapCheck[0]) * vRayUnitStepSize[0]
-	} else {
-		vStep[0] = 1
-		vRayLength1D[0] = (vMapCheck[0] + 1 - g.playerPos[0]) * vRayUnitStepSize[0]
-	}
-	if rayDir[1] < 0 {
-		vStep[1] = -1
-		vRayLength1D[1] = (g.playerPos[1] - vMapCheck[1]) * vRayUnitStepSize[1]
-	} else {
-		vStep[1] = 1
-		vRayLength1D[1] = (vMapCheck[1] + 1 - g.playerPos[1]) * vRayUnitStepSize[1]
-	}
-
-	solidFound := false
-	distance := 0.0
-	maxDistance := 100.0
-
-	for !solidFound && distance < maxDistance {
-		if vRayLength1D[0] < vRayLength1D[1] {
-			vMapCheck[0] += vStep[0]
-			distance = vRayLength1D[0]
-			vRayLength1D[0] += vRayUnitStepSize[0]
-		} else {
-			vMapCheck[1] += vStep[1]
-			distance = vRayLength1D[1]
-			vRayLength1D[1] += vRayUnitStepSize[1]
-		}
-
-		if vMapCheck[0] >= 0 && vMapCheck[0] < MAP_WIDTH && vMapCheck[1] >= 0 && vMapCheck[1] < MAP_HEIGHT {
-			if g.gridMap[int(vMapCheck[1])][int(vMapCheck[0])] == 1 {
-				solidFound = true
-			}
-		}
-	}
-
+	r := ray.NewRayFromTarget(g.playerPos, vec.Vec2{float64(mouseX) / TILE_SIZE, float64(mouseY) / TILE_SIZE})
+	intersection, solidFound := r.Cast(g.gridMap)
 	if solidFound {
-		intersection := rayStart.Copy()
-		vDist := rayDir.Copy()
-		vDist.Scale(distance)
-		intersection.Add(vDist)
 		interX, interY := getDisplayPos(intersection)
 		vector.StrokeCircle(screen, interX, interY, TILE_SIZE/5, 1, color.RGBA{200, 200, 0, 255}, true)
 	}
@@ -133,10 +82,14 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 }
 
 func main() {
-	game := &Game{}
+	game := &Game{
+		gridMap:   make([][]int, MAP_HEIGHT),
+		playerPos: vec.Vec2{float64(MAP_WIDTH / 2), float64(MAP_HEIGHT / 2)},
+	}
 
-	game.playerPos[0] = float64(MAP_WIDTH / 2)
-	game.playerPos[1] = float64(MAP_HEIGHT / 2)
+	for i := range game.gridMap {
+		game.gridMap[i] = make([]int, MAP_WIDTH)
+	}
 
 	ebiten.SetWindowSize(960, 640)
 	ebiten.SetWindowTitle("Raycaster")
