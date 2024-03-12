@@ -19,7 +19,7 @@ const (
 var COLOR_GREY = color.RGBA{200, 200, 200, 255}
 
 type Game struct {
-	gridMap   [MAP_WIDTH * MAP_HEIGHT]int
+	gridMap   [MAP_HEIGHT][MAP_WIDTH]int
 	playerPos [2]float32
 }
 
@@ -36,6 +36,10 @@ func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		g.playerPos[0] += 2
 	}
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButton0) {
+		mouseX, mouseY := ebiten.CursorPosition()
+		g.gridMap[mouseY/TILE_SIZE][mouseX/TILE_SIZE] = 1
+	}
 	return nil
 }
 
@@ -43,7 +47,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for y := range MAP_HEIGHT {
 		for x := range MAP_WIDTH {
 			disX, disY := float32(x*TILE_SIZE), float32(y*TILE_SIZE)
-			if g.gridMap[y*MAP_WIDTH+x] == 1 {
+			if g.gridMap[y][x] == 1 {
 				vector.DrawFilledRect(screen, disX, disY, TILE_SIZE, TILE_SIZE, color.White, false)
 			}
 			vector.StrokeRect(screen, disX, disY, TILE_SIZE, TILE_SIZE, 1, COLOR_GREY, false)
@@ -63,7 +67,6 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 func main() {
 	game := &Game{}
 
-	game.gridMap[MAP_WIDTH+1] = 1
 	game.playerPos[0] = SCREEN_HEIGHT / 2
 	game.playerPos[1] = SCREEN_WIDTH / 2
 
