@@ -3,6 +3,7 @@ package main
 import (
 	"image/color"
 	"log"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -40,7 +41,10 @@ func (g *Game) Update() error {
 	}
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButton0) {
 		mouseX, mouseY := ebiten.CursorPosition()
-		g.gridMap[mouseY/TILE_SIZE][mouseX/TILE_SIZE] = 1
+		x, y := mouseX/TILE_SIZE, mouseY/TILE_SIZE
+		if 0 <= y && y < MAP_HEIGHT && 0 <= x && x < MAP_WIDTH {
+			g.gridMap[y][x] = 1
+		}
 	}
 	return nil
 }
@@ -61,16 +65,23 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	playerDisplayX, playerDisplayY := getDisplayPos(g.playerPos)
 	vector.StrokeLine(screen, playerDisplayX, playerDisplayY, float32(mouseX), float32(mouseY), 1, color.White, true)
 
-	r := ray.NewRayFromTarget(g.playerPos, vec.Vec2{float64(mouseX) / TILE_SIZE, float64(mouseY) / TILE_SIZE})
-	intersection, solidFound := r.Cast(g.gridMap)
-	if solidFound {
-		interX, interY := getDisplayPos(intersection)
-		vector.StrokeCircle(screen, interX, interY, TILE_SIZE/5, 1, color.RGBA{200, 200, 0, 255}, true)
+	rayDir := vec.Vec2{float64(mouseX) / TILE_SIZE, float64(mouseY) / TILE_SIZE}
+	rayDir.Sub(g.playerPos)
+	originAngle := math.Atan2(rayDir[1], rayDir[0])
+
+	for angleOffset := -math.Pi / 4; angleOffset < math.Pi/4; angleOffset += 0.1 {
+		angle := originAngle + angleOffset
+		r := ray.NewRayFromAngle(g.playerPos, angle)
+		intersection, solidFound := r.Cast(g.gridMap)
+		if solidFound {
+			interX, interY := getDisplayPos(intersection)
+			vector.StrokeCircle(screen, interX, interY, TILE_SIZE/5, 1, color.RGBA{200, 200, 0, 255}, true)
+			vector.StrokeLine(screen, playerDisplayX, playerDisplayY, interX, interY, 1, color.White, true)
+		}
 	}
 
 	vector.DrawFilledCircle(screen, float32(mouseX), float32(mouseY), TILE_SIZE/4, color.RGBA{0, 200, 0, 255}, true)
 	vector.DrawFilledCircle(screen, playerDisplayX, playerDisplayY, TILE_SIZE/4, color.RGBA{255, 100, 100, 255}, true)
-
 }
 
 func getDisplayPos(v vec.Vec2) (float32, float32) {
