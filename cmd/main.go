@@ -6,12 +6,13 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	vec "github.com/hhubert6/Raycaster/internal"
 )
 
 const (
 	SCREEN_WIDTH  = 960
 	SCREEN_HEIGHT = 640
-	MAP_WIDTH     = 30
+	MAP_WIDTH     = 31
 	MAP_HEIGHT    = 20
 	TILE_SIZE     = 32
 )
@@ -20,21 +21,21 @@ var COLOR_GREY = color.RGBA{200, 200, 200, 255}
 
 type Game struct {
 	gridMap   [MAP_HEIGHT][MAP_WIDTH]int
-	playerPos [2]float32
+	playerPos vec.Vec2
 }
 
 func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.playerPos[1] -= 2
+		g.playerPos[1] -= 0.1
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.playerPos[1] += 2
+		g.playerPos[1] += 0.1
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.playerPos[0] -= 2
+		g.playerPos[0] -= 0.1
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.playerPos[0] += 2
+		g.playerPos[0] += 0.1
 	}
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButton0) {
 		mouseX, mouseY := ebiten.CursorPosition()
@@ -55,9 +56,27 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	mouseX, mouseY := ebiten.CursorPosition()
-	vector.DrawFilledCircle(screen, float32(mouseX), float32(mouseY), TILE_SIZE/4, color.RGBA{200, 200, 0, 255}, false)
 
-	vector.DrawFilledCircle(screen, g.playerPos[0], g.playerPos[1], TILE_SIZE/4, color.RGBA{255, 100, 100, 255}, false)
+	playerDisplayX, playerDisplayY := getDisplayPos(g.playerPos)
+
+	vector.StrokeLine(screen, playerDisplayX, playerDisplayY, float32(mouseX), float32(mouseY), 1, color.White, true)
+
+	rayDir := vec.Vec2{float64(mouseX) / TILE_SIZE, float64(mouseY) / TILE_SIZE}
+	rayDir.Sub(g.playerPos)
+	rayDir.Normalize()
+
+	dst := g.playerPos.Copy()
+	dst.Add(rayDir)
+	dstX, dstY := getDisplayPos(dst)
+	vector.StrokeLine(screen, playerDisplayX, playerDisplayY, dstX, dstY, 1, color.RGBA{200, 200, 0, 255}, true)
+
+	vector.DrawFilledCircle(screen, float32(mouseX), float32(mouseY), TILE_SIZE/4, color.RGBA{200, 200, 0, 255}, true)
+	vector.DrawFilledCircle(screen, playerDisplayX, playerDisplayY, TILE_SIZE/4, color.RGBA{255, 100, 100, 255}, true)
+
+}
+
+func getDisplayPos(v vec.Vec2) (float32, float32) {
+	return float32(v[0] * TILE_SIZE), float32(v[1] * TILE_SIZE)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
@@ -67,8 +86,8 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 func main() {
 	game := &Game{}
 
-	game.playerPos[0] = SCREEN_HEIGHT / 2
-	game.playerPos[1] = SCREEN_WIDTH / 2
+	game.playerPos[0] = float64(MAP_WIDTH / 2)
+	game.playerPos[1] = float64(MAP_HEIGHT / 2)
 
 	ebiten.SetWindowSize(960, 640)
 	ebiten.SetWindowTitle("Raycaster")
