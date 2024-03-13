@@ -16,28 +16,44 @@ const (
 	SCREEN_HEIGHT = 640
 	MAP_WIDTH     = 24
 	MAP_HEIGHT    = 16
-	TILE_SIZE     = 40
+	TILE_SIZE     = 10
+	FOV           = math.Pi / 2
 )
 
 var COLOR_GREY = color.RGBA{200, 200, 200, 255}
 
 type Game struct {
-	gridMap   [][]int
-	playerPos vec.Vec2
+	gridMap     [][]int
+	playerPos   vec.Vec2
+	playerAngle float64
 }
 
 func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.playerPos[1] -= 0.1
+		dx, dy := math.Cos(g.playerAngle), math.Sin(g.playerAngle)
+		g.playerPos[0] += 0.1 * dx
+		g.playerPos[1] += 0.1 * dy
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.playerPos[1] += 0.1
+		dx, dy := math.Cos(g.playerAngle), math.Sin(g.playerAngle)
+		g.playerPos[0] -= 0.1 * dx
+		g.playerPos[1] -= 0.1 * dy
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.playerPos[0] -= 0.1
+		dx, dy := math.Cos(g.playerAngle-math.Pi/2), math.Sin(g.playerAngle-math.Pi/2)
+		g.playerPos[0] += 0.1 * dx
+		g.playerPos[1] += 0.1 * dy
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.playerPos[0] += 0.1
+		dx, dy := math.Cos(g.playerAngle+math.Pi/2), math.Sin(g.playerAngle+math.Pi/2)
+		g.playerPos[0] += 0.1 * dx
+		g.playerPos[1] += 0.1 * dy
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
+		g.playerAngle -= 0.02
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyRight) {
+		g.playerAngle += 0.02
 	}
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButton0) {
 		mouseX, mouseY := ebiten.CursorPosition()
@@ -50,6 +66,28 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	angle := g.playerAngle - FOV/2
+
+	numOfRays := 160
+	offsetStep := FOV / float64(numOfRays)
+
+	for i := 0; i < numOfRays; i++ {
+		angle += offsetStep
+		r := ray.NewRayFromAngle(g.playerPos, angle)
+		intersection, wall, solidFound := r.Cast(g.gridMap)
+		if solidFound {
+			x := i * (SCREEN_WIDTH / numOfRays)
+			dist := intersection.Copy()
+			dist.Sub(g.playerPos)
+			height := SCREEN_HEIGHT / dist.Length()
+			y := SCREEN_HEIGHT/2 - height/2
+
+			v := uint8(255 - 10*dist.Length() - float64(wall*50))
+			clr := color.RGBA{v, v, v, 255}
+			vector.DrawFilledRect(screen, float32(x), float32(y), float32(SCREEN_WIDTH/numOfRays), float32(height), clr, false)
+		}
+	}
+
 	for y := range MAP_HEIGHT {
 		for x := range MAP_WIDTH {
 			disX, disY := float32(x*TILE_SIZE), float32(y*TILE_SIZE)
@@ -59,28 +97,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			vector.StrokeRect(screen, disX, disY, TILE_SIZE, TILE_SIZE, 1, COLOR_GREY, false)
 		}
 	}
-
-	mouseX, mouseY := ebiten.CursorPosition()
-
 	playerDisplayX, playerDisplayY := getDisplayPos(g.playerPos)
-	vector.StrokeLine(screen, playerDisplayX, playerDisplayY, float32(mouseX), float32(mouseY), 1, color.White, true)
-
-	rayDir := vec.Vec2{float64(mouseX) / TILE_SIZE, float64(mouseY) / TILE_SIZE}
-	rayDir.Sub(g.playerPos)
-	originAngle := math.Atan2(rayDir[1], rayDir[0])
-
-	for angleOffset := -math.Pi / 4; angleOffset < math.Pi/4; angleOffset += 0.1 {
-		angle := originAngle + angleOffset
-		r := ray.NewRayFromAngle(g.playerPos, angle)
-		intersection, solidFound := r.Cast(g.gridMap)
-		if solidFound {
-			interX, interY := getDisplayPos(intersection)
-			vector.StrokeCircle(screen, interX, interY, TILE_SIZE/5, 1, color.RGBA{200, 200, 0, 255}, true)
-			vector.StrokeLine(screen, playerDisplayX, playerDisplayY, interX, interY, 1, color.White, true)
-		}
-	}
-
-	vector.DrawFilledCircle(screen, float32(mouseX), float32(mouseY), TILE_SIZE/4, color.RGBA{0, 200, 0, 255}, true)
+	dst := g.playerPos.Copy()
+	playerDir := vec.Vec2{math.Cos(g.playerAngle), math.Sin(g.playerAngle)}
+	playerDir.Scale(5)
+	dst.Add(playerDir)
+	dstX, dstY := getDisplayPos(dst)
+	vector.StrokeLine(screen, playerDisplayX, playerDisplayY, dstX, dstY, 1, color.White, false)
 	vector.DrawFilledCircle(screen, playerDisplayX, playerDisplayY, TILE_SIZE/4, color.RGBA{255, 100, 100, 255}, true)
 }
 
@@ -94,8 +117,9 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 
 func main() {
 	game := &Game{
-		gridMap:   make([][]int, MAP_HEIGHT),
-		playerPos: vec.Vec2{float64(MAP_WIDTH / 2), float64(MAP_HEIGHT / 2)},
+		gridMap:     make([][]int, MAP_HEIGHT),
+		playerPos:   vec.Vec2{float64(MAP_WIDTH / 2), float64(MAP_HEIGHT / 2)},
+		playerAngle: 0,
 	}
 
 	for i := range game.gridMap {
