@@ -7,6 +7,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	entities "github.com/hhubert6/Raycaster/internal/entities"
 	ray "github.com/hhubert6/Raycaster/internal/raycaster"
 	vec "github.com/hhubert6/Raycaster/internal/vector"
 )
@@ -17,43 +18,37 @@ const (
 	MAP_WIDTH     = 24
 	MAP_HEIGHT    = 16
 	TILE_SIZE     = 10
-	FOV           = math.Pi / 2
+	FOV           = math.Pi / 3
 )
 
-var COLOR_GREY = color.RGBA{200, 200, 200, 255}
+var (
+	COLOR_GREY  = color.RGBA{200, 200, 200, 255}
+	SCREEN_DIST = (SCREEN_WIDTH / 2) / math.Tan(FOV/2)
+)
 
 type Game struct {
 	gridMap     [][]int
-	playerPos   vec.Vec2
-	playerAngle float64
+	player      entities.Player
 }
 
 func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		dx, dy := math.Cos(g.playerAngle), math.Sin(g.playerAngle)
-		g.playerPos[0] += 0.1 * dx
-		g.playerPos[1] += 0.1 * dy
+		g.player.Move(entities.FORWARD)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		dx, dy := math.Cos(g.playerAngle), math.Sin(g.playerAngle)
-		g.playerPos[0] -= 0.1 * dx
-		g.playerPos[1] -= 0.1 * dy
+		g.player.Move(entities.BACKWARD)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		dx, dy := math.Cos(g.playerAngle-math.Pi/2), math.Sin(g.playerAngle-math.Pi/2)
-		g.playerPos[0] += 0.1 * dx
-		g.playerPos[1] += 0.1 * dy
+		g.player.Move(entities.LEFT)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		dx, dy := math.Cos(g.playerAngle+math.Pi/2), math.Sin(g.playerAngle+math.Pi/2)
-		g.playerPos[0] += 0.1 * dx
-		g.playerPos[1] += 0.1 * dy
+		g.player.Move(entities.RIGHT)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		g.playerAngle -= 0.02
+		g.player.Rotate(-0.02)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		g.playerAngle += 0.02
+		g.player.Rotate(0.02)
 	}
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButton0) {
 		mouseX, mouseY := ebiten.CursorPosition()
@@ -66,20 +61,21 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	angle := g.playerAngle - FOV/2
+	angle := g.player.Angle - FOV/2
 
-	numOfRays := 160
+	numOfRays := 240
 	offsetStep := FOV / float64(numOfRays)
 
 	for i := 0; i < numOfRays; i++ {
 		angle += offsetStep
-		r := ray.NewRayFromAngle(g.playerPos, angle)
+		r := ray.NewRayFromAngle(g.player.Pos, angle)
 		intersection, wall, solidFound := r.Cast(g.gridMap)
 		if solidFound {
-			x := i * (SCREEN_WIDTH / numOfRays)
 			dist := intersection.Copy()
-			dist.Sub(g.playerPos)
-			height := SCREEN_HEIGHT / dist.Length()
+			dist.Sub(g.player.Pos)
+			height := SCREEN_DIST / (dist.Length() * math.Cos(g.player.Angle-angle))
+
+			x := i * (SCREEN_WIDTH / numOfRays)
 			y := SCREEN_HEIGHT/2 - height/2
 
 			v := uint8(255 - 10*dist.Length() - float64(wall*50))
@@ -97,9 +93,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			vector.StrokeRect(screen, disX, disY, TILE_SIZE, TILE_SIZE, 1, COLOR_GREY, false)
 		}
 	}
-	playerDisplayX, playerDisplayY := getDisplayPos(g.playerPos)
-	dst := g.playerPos.Copy()
-	playerDir := vec.Vec2{math.Cos(g.playerAngle), math.Sin(g.playerAngle)}
+	playerDisplayX, playerDisplayY := getDisplayPos(g.player.Pos)
+	dst := g.player.Pos.Copy()
+	playerDir := vec.Vec2{math.Cos(g.player.Angle), math.Sin(g.player.Angle)}
 	playerDir.Scale(5)
 	dst.Add(playerDir)
 	dstX, dstY := getDisplayPos(dst)
@@ -117,14 +113,14 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 
 func main() {
 	game := &Game{
-		gridMap:     make([][]int, MAP_HEIGHT),
-		playerPos:   vec.Vec2{float64(MAP_WIDTH / 2), float64(MAP_HEIGHT / 2)},
-		playerAngle: 0,
+		gridMap: make([][]int, MAP_HEIGHT),
 	}
 
 	for i := range game.gridMap {
 		game.gridMap[i] = make([]int, MAP_WIDTH)
 	}
+
+	game.player.Pos = vec.Vec2{float64(MAP_WIDTH / 2), float64(MAP_HEIGHT / 2)}
 
 	ebiten.SetWindowSize(960, 640)
 	ebiten.SetWindowTitle("Raycaster")
