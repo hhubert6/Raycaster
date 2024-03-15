@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	entities "github.com/hhubert6/Raycaster/internal/entities"
 	ray "github.com/hhubert6/Raycaster/internal/raycaster"
@@ -19,6 +21,7 @@ const (
 	MAP_HEIGHT    = 16
 	TILE_SIZE     = 10
 	FOV           = math.Pi / 3
+	NUM_OF_RAYS   = SCREEN_WIDTH / 2
 )
 
 var (
@@ -27,8 +30,8 @@ var (
 )
 
 type Game struct {
-	gridMap     [][]int
-	player      entities.Player
+	gridMap [][]int
+	player  entities.Player
 }
 
 func (g *Game) Update() error {
@@ -61,26 +64,24 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%.2f", ebiten.ActualFPS()), SCREEN_WIDTH-50, 10)
+
 	angle := g.player.Angle - FOV/2
+	offsetStep := FOV / float64(NUM_OF_RAYS)
 
-	numOfRays := 240
-	offsetStep := FOV / float64(numOfRays)
-
-	for i := 0; i < numOfRays; i++ {
+	for i := 0; i < NUM_OF_RAYS; i++ {
 		angle += offsetStep
 		r := ray.NewRayFromAngle(g.player.Pos, angle)
-		intersection, wall, solidFound := r.Cast(g.gridMap)
+		distance, wall, solidFound := r.Cast(g.gridMap)
 		if solidFound {
-			dist := intersection.Copy()
-			dist.Sub(g.player.Pos)
-			height := SCREEN_DIST / (dist.Length() * math.Cos(g.player.Angle-angle))
+			height := SCREEN_DIST / (distance * math.Cos(g.player.Angle-angle))
 
-			x := i * (SCREEN_WIDTH / numOfRays)
+			x := i * (SCREEN_WIDTH / NUM_OF_RAYS)
 			y := SCREEN_HEIGHT/2 - height/2
 
-			v := uint8(255 - 10*dist.Length() - float64(wall*50))
+			v := uint8(255*math.Exp(-distance/15) - float64(wall)*5)
 			clr := color.RGBA{v, v, v, 255}
-			vector.DrawFilledRect(screen, float32(x), float32(y), float32(SCREEN_WIDTH/numOfRays), float32(height), clr, false)
+			vector.DrawFilledRect(screen, float32(x), float32(y), float32(SCREEN_WIDTH/NUM_OF_RAYS), float32(height), clr, false)
 		}
 	}
 
