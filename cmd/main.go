@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 	"log"
 	"math"
@@ -27,6 +28,7 @@ const (
 var (
 	COLOR_GREY  = color.RGBA{200, 200, 200, 255}
 	SCREEN_DIST = (SCREEN_WIDTH / 2) / math.Tan(FOV/2)
+	imgTest     *ebiten.Image
 )
 
 type Game struct {
@@ -36,16 +38,16 @@ type Game struct {
 
 func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.player.Move(entities.FORWARD)
+		g.player.Move(entities.FORWARD, g.gridMap)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.player.Move(entities.BACKWARD)
+		g.player.Move(entities.BACKWARD, g.gridMap)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.player.Move(entities.LEFT)
+		g.player.Move(entities.LEFT, g.gridMap)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.player.Move(entities.RIGHT)
+		g.player.Move(entities.RIGHT, g.gridMap)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
 		g.player.Rotate(-0.02)
@@ -72,14 +74,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for i := 0; i < NUM_OF_RAYS; i++ {
 		angle += offsetStep
 		r := ray.NewRayFromAngle(g.player.Pos, angle)
-		distance, wall, solidFound := r.Cast(g.gridMap)
+		distance, side, solidFound := r.Cast(g.gridMap)
 		if solidFound {
 			height := SCREEN_DIST / (distance * math.Cos(g.player.Angle-angle))
 
 			x := i * (SCREEN_WIDTH / NUM_OF_RAYS)
 			y := SCREEN_HEIGHT/2 - height/2
 
-			v := uint8(255*math.Exp(-distance/15) - float64(wall)*5)
+			v := uint8(255*math.Exp(-distance/15) - float64(side)*5)
 			clr := color.RGBA{v, v, v, 255}
 			vector.DrawFilledRect(screen, float32(x), float32(y), float32(SCREEN_WIDTH/NUM_OF_RAYS), float32(height), clr, false)
 		}
@@ -94,14 +96,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			vector.StrokeRect(screen, disX, disY, TILE_SIZE, TILE_SIZE, 1, COLOR_GREY, false)
 		}
 	}
+	dst := g.player.Pos.Copy().Add(g.player.Dir().Scale(5))
 	playerDisplayX, playerDisplayY := getDisplayPos(g.player.Pos)
-	dst := g.player.Pos.Copy()
-	playerDir := vec.Vec2{math.Cos(g.player.Angle), math.Sin(g.player.Angle)}
-	playerDir.Scale(5)
-	dst.Add(playerDir)
-	dstX, dstY := getDisplayPos(dst)
+	dstX, dstY := getDisplayPos(*dst)
 	vector.StrokeLine(screen, playerDisplayX, playerDisplayY, dstX, dstY, 1, color.White, false)
 	vector.DrawFilledCircle(screen, playerDisplayX, playerDisplayY, TILE_SIZE/4, color.RGBA{255, 100, 100, 255}, true)
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(1, 2)
+	op.GeoM.Translate(50, 50)
+	img := imgTest.SubImage(image.Rect(0, 2, 5, imgTest.Bounds().Dy()))
+
+	screen.DrawImage(ebiten.NewImageFromImage(img), op)
 }
 
 func getDisplayPos(v vec.Vec2) (float32, float32) {
@@ -122,6 +128,11 @@ func main() {
 	}
 
 	game.player.Pos = vec.Vec2{float64(MAP_WIDTH / 2), float64(MAP_HEIGHT / 2)}
+	img, _, err := ebitenutil.NewImageFromFile("assets/redbrick1.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	imgTest = img
 
 	ebiten.SetWindowSize(960, 640)
 	ebiten.SetWindowTitle("Raycaster")

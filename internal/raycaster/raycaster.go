@@ -15,10 +15,8 @@ type Ray struct {
 }
 
 func NewRayFromTarget(start, target vec.Vec2) Ray {
-	rayDir := target
-	rayDir.Sub(start)
-	rayDir.Normalize()
-	return NewRayFromDir(start, rayDir)
+	rayDir := target.Sub(&start).Normalize()
+	return NewRayFromDir(start, *rayDir)
 }
 
 func NewRayFromAngle(start vec.Vec2, angle float64) Ray {
@@ -50,7 +48,7 @@ func NewRayFromDir(start, dir vec.Vec2) Ray {
 	return Ray{start, dir, vRayUnitStepSize, vMapCheck, vRayLength1D, vStep}
 }
 
-func (r *Ray) Cast(gridMap [][]int) (distance float64, wall int, solidFound bool) {
+func (r *Ray) Cast(gridMap [][]int) (distance float64, side int, solidFound bool) {
 	solidFound = false
 	distance = 0.0
 
@@ -58,12 +56,12 @@ func (r *Ray) Cast(gridMap [][]int) (distance float64, wall int, solidFound bool
 		if r.Length1D[0] < r.Length1D[1] {
 			r.MapCheck[0] += r.Step[0]
 			distance = r.Length1D[0]
-			wall = 0
+			side = 0
 			r.Length1D[0] += r.UnitStepSize[0]
 		} else {
 			r.MapCheck[1] += r.Step[1]
 			distance = r.Length1D[1]
-			wall = 1
+			side = 1
 			r.Length1D[1] += r.UnitStepSize[1]
 		}
 
@@ -75,7 +73,9 @@ func (r *Ray) Cast(gridMap [][]int) (distance float64, wall int, solidFound bool
 	}
 
 	if solidFound {
-		return distance, wall, true
+		intersect := r.Start.Copy()
+		intersect.Add(r.Dir.Scale(distance))
+		return distance, side, true
 	}
-	return math.Inf(1), wall, false
+	return math.Inf(1), side, false
 }

@@ -21,7 +21,7 @@ type Player struct {
 	Angle float64
 }
 
-func (p *Player) Move(dir Direction) {
+func (p *Player) Move(dir Direction, gridMap [][]int) {
 	switch dir {
 	case FORWARD:
 		dx, dy := math.Cos(p.Angle), math.Sin(p.Angle)
@@ -44,6 +44,10 @@ func (p *Player) Move(dir Direction) {
 
 func (p *Player) Rotate(angle float64) {
 	p.Angle += angle
+}
+
+func (p *Player) Dir() *vec.Vec2 {
+	return &vec.Vec2{math.Cos(p.Angle), math.Sin(p.Angle)}
 }
 
 func (p *Player) SetPos(v vec.Vec2) {
