@@ -30,12 +30,12 @@ const (
 var (
 	COLOR_GREY  = color.RGBA{200, 200, 200, 255}
 	SCREEN_DIST = (SCREEN_WIDTH / 2) / math.Tan(FOV/2)
-	imgTest     image.Image
 )
 
 type Game struct {
-	gridMap [][]int
-	player  entities.Player
+	gridMap  [][]int
+	player   entities.Player
+	wallsTex map[int][2]image.Image
 }
 
 func (g *Game) Update() error {
@@ -74,8 +74,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for i := 0; i < NUM_OF_RAYS; i++ {
 		angle += offsetStep
 		r := ray.NewRayFromAngle(g.player.Pos, angle)
-		offset, distance, _, solidFound := r.Cast(g.gridMap)
-		if solidFound {
+		offset, distance, side, solidFound := r.Cast(g.gridMap)
+		if solidFound > 0 {
 			height := SCREEN_DIST / (distance * math.Cos(g.player.Angle-angle))
 
 			x := float32(i * RESOLUTION)
@@ -84,7 +84,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			dy := float32(height / 64)
 
 			for i := 0; i < 64; i += 1 {
-				clr := imgTest.At(int(64*offset), i)
+				clr := g.wallsTex[solidFound][side].At(int(64*offset), i)
+				// clr := imgTest.At(int(64*offset), i)
 				vector.DrawFilledRect(screen, x, startY+float32(i)*dy, RESOLUTION, dy, clr, false)
 			}
 		}
@@ -128,7 +129,7 @@ func getImageFromFilePath(filePath string) (image.Image, error) {
 }
 
 func main() {
-	game := &Game{}
+	game := &Game{wallsTex: make(map[int][2]image.Image)}
 
 	game.gridMap = [][]int{
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -155,11 +156,15 @@ func main() {
 
 	game.player.Pos = vec.Vec2{float64(MAP_WIDTH / 2), float64(MAP_HEIGHT / 2)}
 
-	var err error
-	imgTest, err = getImageFromFilePath("assets/redbrick1.png")
+	img1, err := getImageFromFilePath("assets/redbrick1.png")
 	if err != nil {
 		log.Fatal(err)
 	}
+	img2, err := getImageFromFilePath("assets/redbrick2.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	game.wallsTex[1] = [2]image.Image{img1, img2}
 
 	ebiten.SetWindowSize(960, 640)
 	ebiten.SetWindowTitle("Raycaster")
