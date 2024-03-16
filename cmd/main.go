@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"log"
 	"math"
+	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -22,13 +23,14 @@ const (
 	MAP_HEIGHT    = 16
 	TILE_SIZE     = 10
 	FOV           = math.Pi / 3
-	NUM_OF_RAYS   = SCREEN_WIDTH / 2
+	RESOLUTION    = 2
+	NUM_OF_RAYS   = SCREEN_WIDTH / RESOLUTION
 )
 
 var (
 	COLOR_GREY  = color.RGBA{200, 200, 200, 255}
 	SCREEN_DIST = (SCREEN_WIDTH / 2) / math.Tan(FOV/2)
-	imgTest     *ebiten.Image
+	imgTest     image.Image
 )
 
 type Game struct {
@@ -66,24 +68,25 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%.2f", ebiten.ActualFPS()), SCREEN_WIDTH-50, 10)
-
 	angle := g.player.Angle - FOV/2
 	offsetStep := FOV / float64(NUM_OF_RAYS)
 
 	for i := 0; i < NUM_OF_RAYS; i++ {
 		angle += offsetStep
 		r := ray.NewRayFromAngle(g.player.Pos, angle)
-		distance, side, solidFound := r.Cast(g.gridMap)
+		offset, distance, _, solidFound := r.Cast(g.gridMap)
 		if solidFound {
 			height := SCREEN_DIST / (distance * math.Cos(g.player.Angle-angle))
 
-			x := i * (SCREEN_WIDTH / NUM_OF_RAYS)
-			y := SCREEN_HEIGHT/2 - height/2
+			x := float32(i * RESOLUTION)
+			startY := float32(SCREEN_HEIGHT/2 - height/2)
 
-			v := uint8(255*math.Exp(-distance/15) - float64(side)*5)
-			clr := color.RGBA{v, v, v, 255}
-			vector.DrawFilledRect(screen, float32(x), float32(y), float32(SCREEN_WIDTH/NUM_OF_RAYS), float32(height), clr, false)
+			dy := float32(height / 64)
+
+			for i := 0; i < 64; i += 1 {
+				clr := imgTest.At(int(64*offset), i)
+				vector.DrawFilledRect(screen, x, startY+float32(i)*dy, RESOLUTION, dy, clr, false)
+			}
 		}
 	}
 
@@ -102,12 +105,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	vector.StrokeLine(screen, playerDisplayX, playerDisplayY, dstX, dstY, 1, color.White, false)
 	vector.DrawFilledCircle(screen, playerDisplayX, playerDisplayY, TILE_SIZE/4, color.RGBA{255, 100, 100, 255}, true)
 
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Scale(1, 2)
-	op.GeoM.Translate(50, 50)
-	img := imgTest.SubImage(image.Rect(0, 2, 5, imgTest.Bounds().Dy()))
-
-	screen.DrawImage(ebiten.NewImageFromImage(img), op)
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%.2f", ebiten.ActualFPS()), SCREEN_WIDTH-50, 10)
 }
 
 func getDisplayPos(v vec.Vec2) (float32, float32) {
@@ -116,6 +114,16 @@ func getDisplayPos(v vec.Vec2) (float32, float32) {
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
 	return SCREEN_WIDTH, SCREEN_HEIGHT
+}
+
+func getImageFromFilePath(filePath string) (image.Image, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	image, _, err := image.Decode(f)
+	return image, err
 }
 
 func main() {
@@ -128,7 +136,8 @@ func main() {
 	}
 
 	game.player.Pos = vec.Vec2{float64(MAP_WIDTH / 2), float64(MAP_HEIGHT / 2)}
-	img, _, err := ebitenutil.NewImageFromFile("assets/redbrick1.png")
+	// img, _, err := ebitenutil.NewImageFromFile("assets/redbrick1.png")
+	img, err := getImageFromFilePath("assets/redbrick1.png")
 	if err != nil {
 		log.Fatal(err)
 	}

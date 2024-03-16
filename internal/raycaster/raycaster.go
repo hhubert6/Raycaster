@@ -48,7 +48,7 @@ func NewRayFromDir(start, dir vec.Vec2) Ray {
 	return Ray{start, dir, vRayUnitStepSize, vMapCheck, vRayLength1D, vStep}
 }
 
-func (r *Ray) Cast(gridMap [][]int) (distance float64, side int, solidFound bool) {
+func (r *Ray) Cast(gridMap [][]int) (offset float64, distance float64, side int, solidFound bool) {
 	solidFound = false
 	distance = 0.0
 
@@ -75,7 +75,21 @@ func (r *Ray) Cast(gridMap [][]int) (distance float64, side int, solidFound bool
 	if solidFound {
 		intersect := r.Start.Copy()
 		intersect.Add(r.Dir.Scale(distance))
-		return distance, side, true
+		offset := 0.0
+		if side == 0 {
+			if r.Step[0] > 0 {
+				offset = intersect[1] - r.MapCheck[1]
+			} else {
+				offset = r.MapCheck[1] + 1 - intersect[1]
+			}
+		} else {
+			if r.Step[1] > 0 {
+				offset = r.MapCheck[0] + 1 - intersect[0]
+			} else {
+				offset = intersect[0] - r.MapCheck[0]
+			}
+		}
+		return offset, distance, side, true
 	}
-	return math.Inf(1), side, false
+	return 0.0, math.Inf(1), side, false
 }
