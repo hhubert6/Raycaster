@@ -14,6 +14,7 @@ const (
 	RIGHT
 	LEFT
 	MOVEMENT_SPEED = 0.05
+	PLAYER_SIZE    = 5
 )
 
 type Player struct {
@@ -22,23 +23,45 @@ type Player struct {
 }
 
 func (p *Player) Move(dir Direction, gridMap [][]int) {
+	var angle float64
+
 	switch dir {
 	case FORWARD:
-		dx, dy := math.Cos(p.Angle), math.Sin(p.Angle)
-		p.Pos[0] += MOVEMENT_SPEED * dx
-		p.Pos[1] += MOVEMENT_SPEED * dy
+		angle = p.Angle
 	case BACKWARD:
-		dx, dy := math.Cos(p.Angle), math.Sin(p.Angle)
-		p.Pos[0] -= MOVEMENT_SPEED * dx
-		p.Pos[1] -= MOVEMENT_SPEED * dy
+		angle = p.Angle + math.Pi
 	case LEFT:
-		dx, dy := math.Cos(p.Angle-math.Pi/2), math.Sin(p.Angle-math.Pi/2)
-		p.Pos[0] += MOVEMENT_SPEED * dx
-		p.Pos[1] += MOVEMENT_SPEED * dy
+		angle = p.Angle - math.Pi/2
 	case RIGHT:
-		dx, dy := math.Cos(p.Angle+math.Pi/2), math.Sin(p.Angle+math.Pi/2)
-		p.Pos[0] += MOVEMENT_SPEED * dx
-		p.Pos[1] += MOVEMENT_SPEED * dy
+		angle = p.Angle + math.Pi/2
+	}
+
+	dx, dy := math.Cos(angle), math.Sin(angle)
+	p.checkCollision(MOVEMENT_SPEED*dx, MOVEMENT_SPEED*dy, gridMap)
+}
+
+func (p *Player) checkCollision(dx, dy float64, gridMap [][]int) {
+	d := math.Hypot(dx, dy) * PLAYER_SIZE
+
+	horY, vertX := int(p.Pos[1]), int(p.Pos[0])
+	var horX, vertY int
+
+	if dx > 0 {
+		horX = int(p.Pos[0] + d)
+	} else {
+		horX = int(p.Pos[0] - d)
+	}
+	if dy > 0 {
+		vertY = int(p.Pos[1] + d)
+	} else {
+		vertY = int(p.Pos[1] - d)
+	}
+
+	if gridMap[horY][horX] == 0 {
+		p.Pos[0] += dx
+	}
+	if gridMap[vertY][vertX] == 0 {
+		p.Pos[1] += dy
 	}
 }
 
