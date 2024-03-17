@@ -85,7 +85,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 			for i := 0; i < 64; i += 1 {
 				clr := g.wallsTex[solidFound][side].At(int(64*offset), i)
-				// clr := imgTest.At(int(64*offset), i)
 				vector.DrawFilledRect(screen, x, startY+float32(i)*dy, RESOLUTION, dy, clr, false)
 			}
 		}
